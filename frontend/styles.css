@@ -1,0 +1,36 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 2rem;
+  }
+  
+  button {
+    margin: 0.5rem;
+    padding: 0.5rem 1rem;
+  }
+  
+  #message {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+    display: none;
+  }
+  
+  #message.success {
+    background-color: #e6ffed;
+    color: #276749;
+    border: 1px solid #9ae6b4;
+  }
+  
+  #message.error {
+    background-color: #ffe6e6;
+    color: #b22222;
+    border: 1px solid #f5a3a3;
+  }
+  
+  pre {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f7f7f7;
+    border-radius: 6px;
+  }
+  

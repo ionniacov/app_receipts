@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Receipts App</title>
+  <!-- Auth0 SPA SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.1.3/dist/auth0-spa-js.production.js"></script>
+  <!-- Link CSS -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Receipts App</h1>
+    <p class="subtitle">Secure authentication with Auth0 + FastAPI</p>
+
+  <button id="btn-login">Login</button>
+  <button id="btn-logout" disabled>Logout</button>
+  <button id="btn-my" disabled>My Receipts</button>
+
+  <div id="message"></div>
+  <pre id="output">(not logged in)</pre>
+
+  <script>
+    let auth0Client;
+
+    function showMessage(type, text) {
+      const msg = document.getElementById("message");
+      msg.className = type; // "success" or "error"
+      msg.textContent = text;
+      msg.style.display = "block";
+    }
+
+    async function initAuth0() {
+      // Create Auth0 client with PKCE enabled
+      auth0Client = await auth0.createAuth0Client({
+        domain: "dev-ioniacov.eu.auth0.com",
+        clientId: "FIUSA1wdwuPMHUYeyoVHei3TRmYmPgI9",
+        authorizationParams: {
+          audience: "https://api.localhost/receipts",
+          redirect_uri: window.location.origin,
+          scope: "openid profile email"
+        },
+        useRefreshTokens: true,
+        cacheLocation: "localstorage"
+      });
+
+      const params = new URLSearchParams(window.location.search);
+
+      // If login was declined or an error occurred
+      if (params.has("error")) {
+        const error = params.get("error");
+        const desc = params.get("error_description");
+        showMessage("error", `Login failed: ${error}\n${desc}`);
+        window.history.replaceState({}, document.title, "/");
+        return;
+      }
+
+      // Handle successful redirect after login (PKCE flow)
+      if (params.has("code") && params.has("state")) {
+        try {
+          await auth0Client.handleRedirectCallback();
+          window.history.replaceState({}, document.title, "/");
+          showMessage("success", "Login successful!");
+        } catch (error) {
+          showMessage("error", `Login failed: ${error.message}`);
+        }
+      }
+
+      updateUI();
+    }
+
+    async function updateUI() {
+      const isAuthenticated = await auth0Client.isAuthenticated();
+
+      document.getElementById("btn-login").disabled = isAuthenticated;
+      document.getElementById("btn-logout").disabled = !isAuthenticated;
+      document.getElementById("btn-my").disabled = !isAuthenticated;
+
+      if (isAuthenticated) {
+        const user = await auth0Client.getUser();
+        document.getElementById("output").textContent =
+          JSON.stringify(user, null, 2);
+      } else {
+        document.getElementById("output").textContent = "(not logged in)";
+      }
+    }
+
+    // Login
+    document.getElementById("btn-login").addEventListener("click", async () => {
+      await auth0Client.loginWithRedirect();
+    });
+
+    // Logout
+    document.getElementById("btn-logout").addEventListener("click", async () => {
+      await auth0Client.logout({ logoutParams: { returnTo: window.location.origin } });
+      showMessage("success", "You have logged out.");
+    });
+
+    // Fetch receipts
+    document.getElementById("btn-my").addEventListener("click", async () => {
+      const btn = document.getElementById("btn-my");
+      const originalText = btn.textContent;
+      
+      try {
+        // Show loading state
+        btn.innerHTML = '<span class="loading"></span>Loading...';
+        btn.disabled = true;
+        
+        const token = await auth0Client.getTokenSilently();
+        const res = await fetch("http://127.0.0.1:8000/receipts", {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(`HTTP ${res.status}: ${errorData.detail || res.statusText}`);
+        }
+        
+        const data = await res.json();
+        document.getElementById("output").textContent =
+          JSON.stringify(data, null, 2);
+        showMessage("success", "Fetched receipts successfully!");
+      } catch (err) {
+        showMessage("error", "Error fetching receipts: " + err.message);
+        console.error("Receipt fetch error:", err);
+      } finally {
+        // Reset button state
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    });
+
+    initAuth0();
+  </script>
+</body>
+</html>
